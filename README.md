@@ -10,14 +10,46 @@ press and release are all separate triggers, each with its own action and its ow
 
 ## Install
 
-From the Signal K app store, or:
+Not published to npm. Install it from a local checkout as a `file:` dependency of your
+Signal K config directory:
 
 ```bash
-cd ~/.signalk/node_modules
-npm install signalk-gpio-to-action
+git clone https://github.com/zackphillips/signalk-gpio-to-action.git ~/code/signalk-gpio-to-action
+cd ~/.signalk
+npm install --save ~/code/signalk-gpio-to-action
+sudo systemctl restart signalk
 ```
 
-Restart the server, then enable the plugin under **Server → Plugin Config**.
+That symlinks `~/.signalk/node_modules/signalk-gpio-to-action` to the checkout and records
+the dependency in `~/.signalk/package.json`. There is no build step — the plugin has no
+runtime dependencies.
+
+Then enable it under **Server → Plugin Config**, where it appears as "GPIO to action" with
+the MOB rule already filled in.
+
+To update:
+
+```bash
+git -C ~/code/signalk-gpio-to-action pull && sudo systemctl restart signalk
+```
+
+No reinstall: `node_modules` points at the working tree, so edits and pulls take effect on
+the next restart.
+
+**Do not clone directly into `~/.signalk/node_modules/`.** Installing any plugin from the
+app store runs `npm --save install` with that directory as its cwd, and npm prunes anything
+in `node_modules` that is not listed in `package.json` — your hand-placed checkout gets
+deleted without warning. The `file:` dependency above is listed, so it survives.
+
+Two other things worth knowing if you deviate from the commands above:
+
+- The directory or symlink name must match the `name` field in `package.json`. The server
+  finds plugins by scanning `~/.signalk/node_modules/` for a `package.json` carrying the
+  `signalk-node-server-plugin` keyword, then loads them with
+  `require(path.join(location, metadata.name))`. Rename the clone and it is discovered but
+  fails to load.
+- If `~/.signalk/package.json` does not exist yet, run `npm init -y` there first. A standard
+  Signal K install already has one.
 
 ## The default config is a MOB button
 
