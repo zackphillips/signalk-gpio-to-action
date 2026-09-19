@@ -29,8 +29,8 @@ function mobRule (overrides = {}) {
         notificationMethods: ['visual', 'sound']
       },
       {
-        label: 'Clear MOB after hold',
-        trigger: 'hold',
+        label: 'Clear MOB on release after hold',
+        trigger: 'holdRelease',
         type: 'clear',
         condition: 'targetActive',
         notificationPath: 'notifications.mob.GPIO18',
@@ -62,20 +62,33 @@ test('press raises the MOB notification', async (t) => {
   assert.deepEqual(written.value.method, ['visual', 'sound'])
 })
 
-test('holding from idle raises only, it never clears', async (t) => {
+test('a panic hold from idle raises only, it never clears', async (t) => {
   const { app, plugin } = start([mobRule()])
   t.after(() => plugin.stop())
 
   press(app)
-  await sleep(HOLD_MS * 2)
+  await sleep(HOLD_MS * 3)
   release(app)
+  await sleep(DEBOUNCE_MS * 4)
 
   const written = app.written()
-  assert.equal(written.length, 1, 'the hold must not clear the alarm it just raised')
+  assert.equal(written.length, 1, 'the release must not clear the alarm the same press raised')
   assert.equal(written[0].value.state, 'emergency')
 })
 
-test('press then hold while MOB is active clears it', async (t) => {
+test('a button stuck closed raises once and never clears', async (t) => {
+  const { app, plugin } = start([mobRule()])
+  t.after(() => plugin.stop())
+
+  press(app) // shorted switch: down forever, no release
+  await sleep(HOLD_MS * 4)
+
+  const written = app.written()
+  assert.equal(written.length, 1, 'a stuck button must not silently disarm MOB')
+  assert.equal(written[0].value.state, 'emergency')
+})
+
+test('press then a long hold released while MOB is active clears it', async (t) => {
   const { app, plugin } = start([mobRule()])
   t.after(() => plugin.stop())
 
@@ -84,8 +97,12 @@ test('press then hold while MOB is active clears it', async (t) => {
   release(app)
   await sleep(DEBOUNCE_MS * 2)
 
-  press(app) // MOB already active: the raise is skipped, the hold timer runs
+  press(app) // MOB already active: the raise is skipped
   await sleep(HOLD_MS * 2)
+  assert.equal(app.written().length, 1, 'nothing happens until the button comes back up')
+
+  release(app)
+  await sleep(DEBOUNCE_MS * 2)
 
   const written = app.written()
   assert.equal(written.length, 2)
@@ -147,12 +164,14 @@ test('a value replayed inside the startup grace window fires nothing', async (t)
   assert.equal(app.written().length, 1)
 })
 
-test('condition mode "fire" re-reads the tree and lets a single hold clear its own raise', async (t) => {
+test('condition mode "fire" re-reads the tree and lets one press-and-hold clear its own raise', async (t) => {
   const { app, plugin } = start([mobRule({ conditionMode: 'fire' })])
   t.after(() => plugin.stop())
 
   press(app)
   await sleep(HOLD_MS * 2)
+  release(app)
+  await sleep(DEBOUNCE_MS * 2)
 
   const written = app.written()
   assert.equal(written.length, 2)

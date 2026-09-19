@@ -25,14 +25,31 @@ Out of the box the plugin ships one rule that reproduces the flow this was writt
 
 | Gesture | Condition | Action |
 | --- | --- | --- |
-| press | `notifications.mob.GPIO18` not active | raise `emergency`, "Person Overboard!", visual + sound |
-| hold 5s | `notifications.mob.GPIO18` active | clear to `normal`, "Person Overboard Cleared", no methods |
+| press (button down) | `notifications.mob.GPIO18` not active | raise `emergency`, "Person Overboard!", visual + sound |
+| release after 5 s down | `notifications.mob.GPIO18` active | clear to `normal`, "Person Overboard Cleared", no methods |
 
-So: press raises, a 5 second hold clears, and holding from idle raises only — it never
-clears the alarm it just raised. That last part is the whole reason `Evaluate conditions`
-defaults to **at press time**: the hold's `target is active` test uses the state captured
-when the button went down, not the state your own press created 5 seconds earlier. Set it
-to **when the action fires** if you want a single hold to raise and then clear.
+So: press raises, holding for 5 seconds and then letting go clears, and a panic hold from
+idle raises only — it never clears the alarm it just raised. That last part is the whole
+reason `Evaluate conditions` defaults to **at press time**: the clear's `target is active`
+test uses the state captured when the button went down, not the state your own press created
+5 seconds earlier. Set it to **when the action fires** if you want one press-and-hold to
+raise and then clear.
+
+Two deliberate asymmetries in that table, both worth keeping if you edit it:
+
+- **The raise is on button down**, not on release. It is the life-safety path, so it takes
+  the trigger with no latency and no way to miss it. A duration-band scheme that decides on
+  release has a nasty case: press, hold in a panic while you stare at the water, let go at
+  6 seconds — that lands in the long band, the clear finds nothing active to clear, and you
+  get no alarm at all.
+- **The clear is on release after the hold time** (`holdRelease`), not at the 5 second mark
+  while still held (`hold`). A button that shorts closed — a wet deck switch, a chafed cable
+  — never releases, so it never fires the clear. With a mid-hold trigger the same fault
+  disarms your MOB alarm 5 seconds in and nothing tells you. Fail loud, not quiet. The cost
+  is that you get no feedback at the 5 second mark; you hold, let go, and the alarm stops.
+
+Use `hold` where the action is cheap to trigger by accident and mid-press feedback is worth
+more than stuck-switch immunity — a silence button, for instance.
 
 Set up the GPIO pin in OpenPlotter as a **digital input** publishing to
 `notifications.GPIO18` before configuring the plugin.
@@ -77,18 +94,28 @@ to 0 to disable.
 
 ## Triggers
 
-| Trigger | Fires |
-| --- | --- |
-| `press` | button down, as soon as the edge is accepted |
-| `hold` | still down after the hold time |
-| `release` | button up |
-| `holdRelease` | button up, after `hold` already fired |
-| `shortPress` | button up before the hold time |
-| `doublePress` | second press inside the double press window; cancels the pending `shortPress` |
+| Trigger | Fires | Stuck-closed button |
+| --- | --- | --- |
+| `press` | button down, as soon as the edge is accepted | fires once |
+| `hold` | still down after the hold time | fires |
+| `release` | button up | never fires |
+| `holdRelease` | button up, after a press that lasted at least the hold time | never fires |
+| `shortPress` | button up before the hold time | never fires |
+| `doublePress` | second press inside the double press window; cancels the pending `shortPress` | never fires |
 
 Use `press` for anything safety critical. It has no added latency. `shortPress` waits for
 the hold time to elapse, and waits an extra double-press window on top if double press
 detection is enabled on that input.
+
+`shortPress` and `holdRelease` are the two duration bands of a single button, split at the
+hold time and both decided when the button comes back up. That pair is how you get two
+actions out of one button without a mid-press trigger.
+
+Be careful with `doublePress` on anything destructive. Each press starts a new gesture with
+a fresh condition snapshot, so a double tap from idle can raise on the first tap and then
+satisfy a `target is active` clear on the second — raise and clear in under half a second.
+`holdRelease` does not have this problem: it shares the snapshot of the press that started
+it.
 
 ## Action types
 
@@ -117,7 +144,9 @@ if missing.
 
 Input `notifications.GPIO23`, one action: trigger `press`, type **Silence active
 notifications**, mode `Sound only`, exclude paths `notifications.mob`. Add a second action on
-`hold` with mode `All methods` if you want a long press to also kill the visual.
+`hold` with mode `All methods` if you want a long press to also kill the visual — this is a
+good place for `hold` rather than `holdRelease`, since the visual dropping out while your
+finger is still down tells you it worked.
 
 **Anchor alarm arm/disarm on one button**
 

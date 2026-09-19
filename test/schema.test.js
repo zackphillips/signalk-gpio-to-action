@@ -30,11 +30,13 @@ test('the shipped default is the MOB button flow', () => {
   assert.equal(rule.timing.holdMs, 5000)
 
   const raise = rule.actions.find((a) => a.trigger === 'press')
-  const clear = rule.actions.find((a) => a.trigger === 'hold')
+  const clear = rule.actions.find((a) => a.trigger === 'holdRelease')
   assert.equal(raise.notificationState, 'emergency')
   assert.equal(raise.condition, 'targetInactive')
   assert.equal(clear.type, 'clear')
   assert.equal(clear.condition, 'targetActive')
+  assert.ok(!rule.actions.some((a) => a.trigger === 'hold'),
+    'the destructive action must wait for the release, so a stuck button never fires it')
 })
 
 test('normalizeOptions fills in defaults for a bare rule', () => {
