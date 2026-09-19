@@ -1,0 +1,39 @@
+{
+  "name": "signalk-gpio-to-action",
+  "version": "1.0.0",
+  "description": "Route GPIO digital inputs to Signal K actions: raise or clear notifications (MOB button), silence active alarms, send deltas or PUT requests.",
+  "main": "index.js",
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "keywords": [
+    "signalk-node-server-plugin",
+    "signalk-category-notifications",
+    "signalk-category-hardware",
+    "signalk",
+    "gpio",
+    "openplotter",
+    "mob",
+    "raspberry-pi"
+  ],
+  "author": "Zack Phillips",
+  "license": "BSD-3-Clause",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zackphillips/signalk-gpio-to-action.git"
+  },
+  "bugs": {
+    "url": "https://github.com/zackphillips/signalk-gpio-to-action/issues"
+  },
+  "homepage": "https://github.com/zackphillips/signalk-gpio-to-action#readme",
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "index.js",
+    "lib/",
+    "README.md",
+    "LICENSE"
+  ],
+  "devDependencies": {}
+}
